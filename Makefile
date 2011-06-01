@@ -1,35 +1,29 @@
 #
 # A simple makefile for managing build of project composed of C source files.
 #
-# Julie Zelenski, for CS107, Sept 2009
-#
 
 # It is likely that default C compiler is already gcc, but explicitly
 # set, just to be sure
-CC = gcc
+CC = g++
 
 # The CFLAGS variable sets compile flags for gcc:
 #  -g          compile with debug information
 #  -Wall       give all diagnostic warnings
 #  -pedantic   require compliance with ANSI standard
-#  -0O         do not optimize generated code
-#  -std=gnu99  use the Gnu C99 standard language definition
-#  -m32        emit code for IA32 architecture
-CFLAGS = -g -Wall -pedantic -O0 -std=gnu99 -m32
+CFLAGS = -Wall -g -pedantic
 
 
 # The LDFLAGS variable sets flags for linker
 #  -lm    link in libm (math library)
-#  -m32	  link with IA32 libraries
-LDFLAGS = -lm -m32
+LDFLAGS = -lm
 
 # In this section, you list the files that are part of the project.
 # If you add/change names of header/source files, here is where you
 # edit the Makefile.
 HEADERS =
-SOURCES = reassemble.c
-OBJECTS = $(SOURCES:.c=.o)
-TARGET = reassemble
+SOURCES = detect.cc
+OBJECTS = $(SOURCES:.cc=.o)
+TARGET = detect
 
 
 # The first target defined in the makefile is the one
