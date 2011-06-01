@@ -7,5 +7,9 @@ using namespace std;
 
 int main(int argc, char *argv[], char *env[])
 {
-  cout << "Hello, World" << endl;
+  if(argc != 2) {
+    cout << "Usage: " + string(argv[0]) + " pcap_filename" << endl;
+  } else {
+    cout << argv[1] << endl;
+  }
 }
