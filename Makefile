@@ -15,7 +15,7 @@ CFLAGS = -Wall -g -pedantic
 
 # The LDFLAGS variable sets flags for linker
 #  -lm    link in libm (math library)
-LDFLAGS = -lm
+LDFLAGS = -lm -lpcap
 
 # In this section, you list the files that are part of the project.
 # If you add/change names of header/source files, here is where you
