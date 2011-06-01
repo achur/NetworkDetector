@@ -1,28 +1,27 @@
 #
-# A simple makefile for managing build of project composed of C source files.
+# Very simple makefile
 #
 
-# It is likely that default C compiler is already gcc, but explicitly
-# set, just to be sure
+# C++ compiler
 CC = g++
 
 # The CFLAGS variable sets compile flags for gcc:
-#  -g          compile with debug information
-#  -Wall       give all diagnostic warnings
-#  -pedantic   require compliance with ANSI standard
+#  -g                 compile with debug information
+#  -Wall              give all diagnostic warnings
+#  -pedantic          require compliance with ANSI standard
+#  -L./libpcap-1.1.1  link the libpcap
+#  -lpcap             use lpcap
 CFLAGS = -Wall -g -pedantic
 
 
-# The LDFLAGS variable sets flags for linker
+#  The LDFLAGS variable sets flags for linker
 #  -lm    link in libm (math library)
-LDFLAGS = -lm -lpcap
+LDFLAGS = -I./libpcap/pcap/ -I./libpcap/ -L./libpcap/ -lpcap -lm
 
 # In this section, you list the files that are part of the project.
 # If you add/change names of header/source files, here is where you
 # edit the Makefile.
-HEADERS =
-SOURCES = detect.cc
-OBJECTS = $(SOURCES:.cc=.o)
+SOURCE = detect.cc
 TARGET = detect
 
 
@@ -31,18 +30,9 @@ TARGET = detect
 # above, this Makefile file will build the one named TARGET and
 # assume that it depends on all the named OBJECTS files.
 
-$(TARGET) : $(OBJECTS) Makefile.dependencies
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
+$(TARGET) : $(SOURCE)
+	$(CC) $(SOURCE) $(CFLAGS) -o $(TARGET) $(LDFLAGS)
 
-# In make's default rules, a .o automatically depends on its .c file
-# (so editing the .c will cause recompilation into its .o file).
-# The line below creates additional dependencies, most notably that it
-# will cause the .c to reocmpiled if any included .h file changes.
-
-Makefile.dependencies:: $(SOURCES) $(HEADERS)
-	$(CC) $(CFLAGS) -MM $(SOURCES) > Makefile.dependencies
-
--include Makefile.dependencies
 
 # Phony means not a "real" target, it doesn't build anything
 # The phony target "clean" that is used to remove all compiled object files.
@@ -50,5 +40,5 @@ Makefile.dependencies:: $(SOURCES) $(HEADERS)
 .PHONY: clean
 
 clean:
-	@rm -fr $(TARGET) $(OBJECTS) core Makefile.dependencies
-
+	@rm -fr $(TARGET) core
+	

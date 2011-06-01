@@ -8,15 +8,23 @@
 #define GETSRCPORT(x) (x->th_sport)
 #define GETDSTPORT(x) (x->th_dport)
 #define GETSEQ(x) (x->th_seq)
+#define GETACKSEQ(x) (x->th_ack)
 #endif // defined(__BSD_BUILD)
 
 #if defined(__LINUX_BUILD)
 #define GETSYN(x) ((x->syn) > 0 ? 1 : 0)
 #define GETACK(x) ((x->ack) > 0 ? 1 : 0)
+#define GETRST(x) ((x->rst) > 0 ? 1 : 0)
+#define GETSRCPORT(x) (x->source)
+#define GETDSTPORT(x) (x->dest)
+#define GETSEQ(x) (x->seq)
+#define GETACKSEQ(x) (x->ack_seq)
 #endif // defined(__LINUX_BUILD)
 
+#define __IP_HDR_LENGTH(ip) (ip->ip_hl << 2)
+
 #include <iostream>
-#include <pcap.h>
+#include "pcap.h"
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -53,12 +61,12 @@ void runDetection(pcap_t* pcap) {
     }
     if(result == -2) break;
     struct ip* ip_hdr = (struct ip*) (packet_data+14);
-    if(ip_hdr->ip_p != 6) cout << "test" << endl; // If we don't have a TCP packet.
+    if(ip_hdr->ip_p != 6) continue; // If we don't have a TCP packet.
     char src[80];
     inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_src), src, 80);
     char dst[80];
     inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_dst), dst, 80);
-    struct tcphdr* tcp_hdr = (struct tcphdr*) (packet_data + 14 + ip_hdr->ip_hl * 4);
+    struct tcphdr* tcp_hdr = (struct tcphdr*) ((char *)ip_hdr + __IP_HDR_LENGTH(ip_hdr));
     cout << "Source: " << src << "   Destination: " << dst << endl;
     cout << "S_PORT: " << GETSRCPORT(tcp_hdr) << "   D_PORT: " << GETDSTPORT(tcp_hdr) << "  SEQ: " << GETSEQ(tcp_hdr) << endl;
     if(GETSYN(tcp_hdr) > 0) cout << "SYN ";
