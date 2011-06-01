@@ -42,7 +42,7 @@
 using namespace std;
 
 // Function Prototypes
-void runDetection(pcap_t* pcap);
+void printPackets(pcap_t* pcap);
 
 
 int main(int argc, char *argv[], char *env[]) {
@@ -55,13 +55,17 @@ int main(int argc, char *argv[], char *env[]) {
     if(handle == NULL) {
       cout << string(errbuf) << endl;
     } else {
-      runDetection(handle);
+      printPackets(handle);
     }
   }
   return 0;
 }
 
-void runDetection(pcap_t* pcap) {
+/*
+ *  A little warmup and debugging
+ *  Prints out all the relevant info from all the packets in the trace
+ */
+void printPackets(pcap_t* pcap) {
   while(true) {
     const u_char *packet_data;
     struct pcap_pkthdr *header;
@@ -77,12 +81,11 @@ void runDetection(pcap_t* pcap) {
     char dst[80];
     inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_dst), dst, 80);
     struct tcphdr* tcp_hdr = (struct tcphdr*) ((char *)ip_hdr + __IP_HDR_LENGTH(ip_hdr));
-    cout << "Source: " << src << "   Destination: " << dst << endl;
-    cout << "S_PORT: " << GETSRCPORT(tcp_hdr) << "   D_PORT: " << GETDSTPORT(tcp_hdr) << endl;
+    cout << "Source: " << src << ":" << GETSRCPORT(tcp_hdr) << "   Destination: " << dst << ":" << GETDSTPORT(tcp_hdr) << endl;
     cout << "SEQ: " << GETSEQ(tcp_hdr) << "    ACK: " << GETACKSEQ(tcp_hdr) << endl;
-    if(GETSYN(tcp_hdr) > 0) cout << "SYN ";
-    if(GETACK(tcp_hdr) > 0) cout << "ACK ";
-    if(GETRST(tcp_hdr) > 0) cout << "RST";
+    if(GETSYN(tcp_hdr)) cout << "SYN ";
+    if(GETACK(tcp_hdr)) cout << "ACK ";
+    if(GETRST(tcp_hdr)) cout << "RST";
     cout << endl << endl;
   }
 }
