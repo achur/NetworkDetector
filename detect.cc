@@ -2,23 +2,23 @@
 #define __BSD_BUILD
 
 #if defined(__BSD_BUILD)
-#define GETSYN(x) ((x->th_flags & TH_SYN) > 0 ? 1 : 0)
-#define GETACK(x) ((x->th_flags & TH_ACK) > 0 ? 1 : 0)
-#define GETRST(x) ((x->th_flags & TH_RST) > 0 ? 1 : 0)
-#define GETSRCPORT(x) (x->th_sport)
-#define GETDSTPORT(x) (x->th_dport)
-#define GETSEQ(x) (x->th_seq)
-#define GETACKSEQ(x) (x->th_ack)
+#define GETSYN(x) ((x->th_flags & TH_SYN) != 0 ? 1 : 0)
+#define GETACK(x) ((x->th_flags & TH_ACK) != 0 ? 1 : 0)
+#define GETRST(x) ((x->th_flags & TH_RST) != 0 ? 1 : 0)
+#define GETSRCPORT(x) (ntohs(x->th_sport))
+#define GETDSTPORT(x) (ntohs(x->th_dport))
+#define GETSEQ(x) (ntohl(x->th_seq))
+#define GETACKSEQ(x) (ntohl(x->th_ack))
 #endif // defined(__BSD_BUILD)
 
 #if defined(__LINUX_BUILD)
-#define GETSYN(x) ((x->syn) > 0 ? 1 : 0)
-#define GETACK(x) ((x->ack) > 0 ? 1 : 0)
-#define GETRST(x) ((x->rst) > 0 ? 1 : 0)
-#define GETSRCPORT(x) (x->source)
-#define GETDSTPORT(x) (x->dest)
-#define GETSEQ(x) (x->seq)
-#define GETACKSEQ(x) (x->ack_seq)
+#define GETSYN(x) ((x->syn) != 0 ? 1 : 0)
+#define GETACK(x) ((x->ack) != 0 ? 1 : 0)
+#define GETRST(x) ((x->rst) != 0 ? 1 : 0)
+#define GETSRCPORT(x) (ntohs(x->source))
+#define GETDSTPORT(x) (ntohs(x->dest))
+#define GETSEQ(x) (ntohl(x->seq))
+#define GETACKSEQ(x) (ntohl(x->ack_seq))
 #endif // defined(__LINUX_BUILD)
 
 #define __IP_HDR_LENGTH(ip) (ip->ip_hl << 2)
@@ -26,8 +26,18 @@
 #include <iostream>
 #include "pcap.h"
 #include <netinet/ip.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
+
+// Here we just favor BSD format for convenience on corn, but
+// to get good results, you probably want to switch to
+// __LINUX_BUILD
+#if !(defined __FAVOR_BSD) && defined(__BSD_BUILD)
+#define __FAVOR_BSD
+#include <netinet/tcp.h>
+#undef __FAVOR_BSD
+#else
+#include <netinet/tcp.h>
+#endif
 
 using namespace std;
 
@@ -68,7 +78,8 @@ void runDetection(pcap_t* pcap) {
     inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_dst), dst, 80);
     struct tcphdr* tcp_hdr = (struct tcphdr*) ((char *)ip_hdr + __IP_HDR_LENGTH(ip_hdr));
     cout << "Source: " << src << "   Destination: " << dst << endl;
-    cout << "S_PORT: " << GETSRCPORT(tcp_hdr) << "   D_PORT: " << GETDSTPORT(tcp_hdr) << "  SEQ: " << GETSEQ(tcp_hdr) << endl;
+    cout << "S_PORT: " << GETSRCPORT(tcp_hdr) << "   D_PORT: " << GETDSTPORT(tcp_hdr) << endl;
+    cout << "SEQ: " << GETSEQ(tcp_hdr) << "    ACK: " << GETACKSEQ(tcp_hdr) << endl;
     if(GETSYN(tcp_hdr) > 0) cout << "SYN ";
     if(GETACK(tcp_hdr) > 0) cout << "ACK ";
     if(GETRST(tcp_hdr) > 0) cout << "RST";
