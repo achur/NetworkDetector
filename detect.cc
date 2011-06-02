@@ -25,6 +25,8 @@
 
 #include <iostream>
 #include <map>
+#include <stdio.h>
+#include <string.h>
 #include "pcap.h"
 #include <netinet/ip.h>
 #include <arpa/inet.h>
