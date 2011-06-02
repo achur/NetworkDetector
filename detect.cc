@@ -40,6 +40,8 @@
 #include <netinet/tcp.h>
 #endif
 
+#define WARNINGLIMIT 3
+
 struct ip_pair {
   in_addr src;
   in_addr dst;
@@ -49,12 +51,12 @@ struct ip_pair {
     dst = d;
   }
   
-  inline bool operator<(const ip_pair& other) {
+  bool operator<(const ip_pair& other) const {
     return memcmp(&src, &other.src, sizeof(in_addr)) < 0 ||
       (memcmp(&src, &other.src, sizeof(in_addr)) == 0 && memcmp(&dst, &other.dst, sizeof(in_addr)) < 0);
   }
   
-  inline bool operator==(const ip_pair& other) {
+  bool operator==(const ip_pair& other) const {
     return memcmp(&src, &other.src, sizeof(in_addr)) == 0 && memcmp(&dst, &other.dst, sizeof(in_addr)) == 0;
   } 
 };
@@ -74,13 +76,13 @@ struct scan_request {
     return scan_request(dport, sport, ack - 1);
   }
   
-  inline bool operator<(const scan_request& other) {
+  inline bool operator<(const scan_request& other) const {
     return sport < other.sport ||
            (sport == other.sport && dport < other.dport) ||
            (sport == other.sport && dport == other.dport && seq < other.seq);
   }
   
-  inline bool operator==(const scan_request& other) {
+  inline bool operator==(const scan_request& other) const {
     return sport == other.sport && dport == other.dport && seq == other.seq;
   }
 };
@@ -91,9 +93,11 @@ using namespace std;
 // Function Prototypes
 void printPackets(pcap_t* pcap);
 void printTCPPacket(ip* ip_hdr, tcphdr* tcp_hdr);
+string ip_src_string(ip* ip_hdr);
+string ip_dst_string(ip* ip_hdr);
 void buildMap(pcap_t* pcap, map<ip_pair, map<scan_request, int> >& responseMap);
 void mapHandleTCPPacket(ip* ip_hdr, tcphdr* tcp_hdr, map<ip_pair, map<scan_request, int> >& responseMap);
-
+void printWarnings(map<ip_pair, map<scan_request, int> >& responseMap);
 
 
 int main(int argc, char *argv[], char *env[])
@@ -110,6 +114,7 @@ int main(int argc, char *argv[], char *env[])
       // printPackets(handle);
       map<ip_pair, map<scan_request, int> > responseMap;
       buildMap(handle, responseMap);
+      printWarnings(responseMap);
     }
   }
   return 0;
@@ -141,16 +146,33 @@ void printPackets(pcap_t* pcap)
  */
 void printTCPPacket(ip* ip_hdr, tcphdr* tcp_hdr)
 {
-  char src[80]; char dst[80];
-  inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_src), src, 80);
-  inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_dst), dst, 80);
-  cout << "Source: " << src << ":" << GETSRCPORT(tcp_hdr) 
-       << "   Destination: " << dst << ":" << GETDSTPORT(tcp_hdr) << endl;
+  cout << "Source: " << ip_src_string(ip_hdr) << ":" << GETSRCPORT(tcp_hdr) 
+       << "   Destination: " << ip_dst_string(ip_hdr) << ":" << GETDSTPORT(tcp_hdr) << endl;
   cout << "SEQ: " << GETSEQ(tcp_hdr) << "    ACK: " << GETACKSEQ(tcp_hdr) << endl;
   if(GETSYN(tcp_hdr)) cout << "SYN ";
   if(GETACK(tcp_hdr)) cout << "ACK ";
   if(GETRST(tcp_hdr)) cout << "RST";
   cout << endl << endl;
+}
+
+// Utility function to take an in_addr to get a string
+string ip_src_string(ip* ip_hdr) {
+  char src[256];
+  inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_src), src, 256);
+  return string(src);
+}
+
+// Utility function to take an in_addr to get a string
+string ip_dst_string(ip* ip_hdr) {
+  char dst[256];
+  inet_ntop(ip_hdr->ip_v == 4 ? AF_INET : AF_INET6, &(ip_hdr->ip_dst), dst, 256);
+  return string(dst);
+}
+
+string ipv4string(in_addr addr) {
+  char dst[256];
+  inet_ntop(AF_INET, &addr, dst, 256);
+  return string(dst);
 }
 
 /*
@@ -175,13 +197,13 @@ void buildMap(pcap_t* pcap, map<ip_pair, map<scan_request, int> >& responseMap)
 
 
 /*
- *  Go through TCP packet and check if it is a SYN packet or SYN ACK.
- 
+ *  Go through TCP packet and check if it is a SYN packet or SYN/ACK.
+ *
  *  If it is a SYN, go to (or add a new entry to) to the map with the 
  *  appropriate ip_pair and add a pair to its map: (sr, 1) where sr is
  *  the scan_request matching the SYN packet.
  *
- *  If it is a SYN ACK, if you can find it, go to the appropriate ip_pair
+ *  If it is a SYN/ACK, if you can find it, go to the appropriate ip_pair
  *  (dst, src) and if that map exists, go to the appropriate scan_request
  *  (found by calling sr.getSynFromSynAck(ackNum)) and see if we can locate
  *  it in the map.  If we can, change its value to 0 (indicating that the
@@ -189,6 +211,38 @@ void buildMap(pcap_t* pcap, map<ip_pair, map<scan_request, int> >& responseMap)
  */
 void mapHandleTCPPacket(ip* ip_hdr, tcphdr* tcp_hdr, map<ip_pair, map<scan_request, int> >& responseMap)
 {
-  // Fill this in
+  if(GETSYN(tcp_hdr) && GETACK(tcp_hdr)) { // SYN/ACK
+    ip_pair ipp(ip_hdr->ip_dst, ip_hdr->ip_src);
+    if(responseMap.find(ipp) != responseMap.end()) {
+      scan_request sr = scan_request(GETSRCPORT(tcp_hdr), GETDSTPORT(tcp_hdr), GETSYN(tcp_hdr)).getSynFromSynAck(GETACKSEQ(tcp_hdr));
+      if(responseMap[ipp].find(sr) != responseMap[ipp].end()) {
+        responseMap[ipp][sr] = 1;
+      }
+    }
+  } else if(GETSYN(tcp_hdr) && !GETACK(tcp_hdr)) { // SYN
+    ip_pair ipp(ip_hdr->ip_src, ip_hdr->ip_dst);
+    scan_request sr(GETSRCPORT(tcp_hdr), GETDSTPORT(tcp_hdr), GETSEQ(tcp_hdr));
+    responseMap[ipp][sr] = 0;
+  }
 }
 
+/*
+ *  Take the map and print out all the ip pairs that are above a certain
+ *  threshhold.
+ */
+void printWarnings(map<ip_pair, map<scan_request, int> >& responseMap)
+{
+  for (map<ip_pair, map<scan_request, int> >::const_iterator it = responseMap.begin(); it != responseMap.end(); ++it) {
+    ip_pair pair = it->first;
+    map<scan_request, int> innerMap = it->second;
+    int syn = 0;
+    int synack = 0;
+    for (map<scan_request, int>::const_iterator iter = innerMap.begin(); iter != innerMap.end(); ++iter) {
+      syn += (1 - iter->second); // add in 1 for a SYN packet
+      synack += iter->second; // add in 1 for a SYN/ACK packet
+    }
+    if(synack == 0 || (((double)syn)/((double)synack)) >= WARNINGLIMIT) {
+      cout << ipv4string(pair.src) << " " << ipv4string(pair.dst) << endl;
+    }
+  }
+}
